@@ -1,0 +1,52 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Customer Portal Cache - Redis session store'
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  SubnetIdAZa:
+    Type: AWS::EC2::Subnet::Id
+    Description: Private subnet in us-east-1a
+  SubnetIdAZb:
+    Type: AWS::EC2::Subnet::Id
+    Description: Private subnet in us-east-1b
+
+Resources:
+  CacheSubnetGroup:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      Description: Cache subnet group
+      SubnetIds:
+        - !Ref SubnetIdAZa
+
+  CacheSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Redis cache security group
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 6379
+          ToPort: 6379
+          CidrIp: 10.0.0.0/16
+
+  PortalCache:
+    Type: AWS::ElastiCache::CacheCluster
+    Properties:
+      CacheNodeType: cache.t3.medium
+      Engine: redis
+      NumCacheNodes: 1
+      CacheSubnetGroupName: !Ref CacheSubnetGroup
+      VpcSecurityGroupIds:
+        - !GetAtt CacheSecurityGroup.GroupId
+      Tags:
+        - Key: Name
+          Value: portal-cache
+        - Key: Workload
+          Value: customer-portal
+
+Outputs:
+  CacheEndpoint:
+    Value: !GetAtt PortalCache.RedisEndpoint.Address
+  CachePort:
+    Value: !GetAtt PortalCache.RedisEndpoint.Port
