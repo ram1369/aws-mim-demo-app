@@ -69,11 +69,13 @@ Resources:
           Value: customer-portal
 
 Outputs:
-  # Old endpoint (consumers still using this)
-  LegacyCacheEndpoint:
-    Value: !GetAtt PortalCache.RedisEndpoint.Address
-  # New endpoint (consumers should migrate to this)
+  # Current endpoint - consumers keep using this until cutover
   CacheEndpoint:
-    Value: !GetAtt PortalCacheMultiAZ.PrimaryEndPoint.Address
+    Value: !GetAtt PortalCache.RedisEndpoint.Address
   CachePort:
+    Value: !GetAtt PortalCache.RedisEndpoint.Port
+  # New Multi-AZ endpoint - consumers migrate to this in a follow-up change
+  MultiAZCacheEndpoint:
+    Value: !GetAtt PortalCacheMultiAZ.PrimaryEndPoint.Address
+  MultiAZCachePort:
     Value: !GetAtt PortalCacheMultiAZ.PrimaryEndPoint.Port
