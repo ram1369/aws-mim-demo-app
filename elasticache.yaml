@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Customer Portal Cache - Redis session store'
+Description: 'Customer Portal Cache - Multi-AZ (FIXED)'
 
 Parameters:
   VpcId:
@@ -15,9 +15,10 @@ Resources:
   CacheSubnetGroup:
     Type: AWS::ElastiCache::SubnetGroup
     Properties:
-      Description: Cache subnet group
+      Description: Cache subnet group - Multi-AZ
       SubnetIds:
         - !Ref SubnetIdAZa
+        - !Ref SubnetIdAZb
 
   CacheSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -30,14 +31,17 @@ Resources:
           ToPort: 6379
           CidrIp: 10.0.0.0/16
 
-  PortalCache:
-    Type: AWS::ElastiCache::CacheCluster
+  PortalCacheReplicationGroup:
+    Type: AWS::ElastiCache::ReplicationGroup
     Properties:
-      CacheNodeType: cache.t3.medium
+      ReplicationGroupDescription: Customer Portal Redis - Multi-AZ
       Engine: redis
-      NumCacheNodes: 1
+      CacheNodeType: cache.t3.medium
+      NumCacheClusters: 2
+      MultiAZEnabled: true
+      AutomaticFailoverEnabled: true
       CacheSubnetGroupName: !Ref CacheSubnetGroup
-      VpcSecurityGroupIds:
+      SecurityGroupIds:
         - !GetAtt CacheSecurityGroup.GroupId
       Tags:
         - Key: Name
@@ -47,6 +51,6 @@ Resources:
 
 Outputs:
   CacheEndpoint:
-    Value: !GetAtt PortalCache.RedisEndpoint.Address
+    Value: !GetAtt PortalCacheReplicationGroup.PrimaryEndPoint.Address
   CachePort:
-    Value: !GetAtt PortalCache.RedisEndpoint.Port
+    Value: !GetAtt PortalCacheReplicationGroup.PrimaryEndPoint.Port
