@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Customer Portal Cache - Migration to Multi-AZ'
+Description: 'Customer Portal Cache - Redis session store'
 
 Parameters:
   VpcId:
@@ -15,10 +15,9 @@ Resources:
   CacheSubnetGroup:
     Type: AWS::ElastiCache::SubnetGroup
     Properties:
-      Description: Cache subnet group - Multi-AZ
+      Description: Cache subnet group
       SubnetIds:
         - !Ref SubnetIdAZa
-        - !Ref SubnetIdAZb
 
   CacheSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -31,11 +30,8 @@ Resources:
           ToPort: 6379
           CidrIp: 10.0.0.0/16
 
-  # EXISTING: Keep until consumers cut over
   PortalCache:
     Type: AWS::ElastiCache::CacheCluster
-    DeletionPolicy: Snapshot
-    UpdateReplacePolicy: Snapshot
     Properties:
       CacheNodeType: cache.t3.medium
       Engine: redis
@@ -45,37 +41,12 @@ Resources:
         - !GetAtt CacheSecurityGroup.GroupId
       Tags:
         - Key: Name
-          Value: portal-cache-legacy
-        - Key: Workload
-          Value: customer-portal
-
-  # NEW: Multi-AZ ReplicationGroup
-  PortalCacheMultiAZ:
-    Type: AWS::ElastiCache::ReplicationGroup
-    Properties:
-      ReplicationGroupDescription: Customer Portal Redis - Multi-AZ
-      Engine: redis
-      CacheNodeType: cache.t3.medium
-      NumCacheClusters: 2
-      MultiAZEnabled: true
-      AutomaticFailoverEnabled: true
-      CacheSubnetGroupName: !Ref CacheSubnetGroup
-      SecurityGroupIds:
-        - !GetAtt CacheSecurityGroup.GroupId
-      Tags:
-        - Key: Name
           Value: portal-cache
         - Key: Workload
           Value: customer-portal
 
 Outputs:
-  # Current endpoint - consumers keep using this until cutover
   CacheEndpoint:
     Value: !GetAtt PortalCache.RedisEndpoint.Address
   CachePort:
     Value: !GetAtt PortalCache.RedisEndpoint.Port
-  # New Multi-AZ endpoint - consumers migrate to this in a follow-up change
-  MultiAZCacheEndpoint:
-    Value: !GetAtt PortalCacheMultiAZ.PrimaryEndPoint.Address
-  MultiAZCachePort:
-    Value: !GetAtt PortalCacheMultiAZ.PrimaryEndPoint.Port
