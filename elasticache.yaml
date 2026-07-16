@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Customer Portal Cache - Multi-AZ (FIXED)'
+Description: 'Customer Portal Cache - Migration to Multi-AZ'
 
 Parameters:
   VpcId:
@@ -31,7 +31,26 @@ Resources:
           ToPort: 6379
           CidrIp: 10.0.0.0/16
 
-  PortalCacheReplicationGroup:
+  # EXISTING: Keep until consumers cut over
+  PortalCache:
+    Type: AWS::ElastiCache::CacheCluster
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      CacheNodeType: cache.t3.medium
+      Engine: redis
+      NumCacheNodes: 1
+      CacheSubnetGroupName: !Ref CacheSubnetGroup
+      VpcSecurityGroupIds:
+        - !GetAtt CacheSecurityGroup.GroupId
+      Tags:
+        - Key: Name
+          Value: portal-cache-legacy
+        - Key: Workload
+          Value: customer-portal
+
+  # NEW: Multi-AZ ReplicationGroup
+  PortalCacheMultiAZ:
     Type: AWS::ElastiCache::ReplicationGroup
     Properties:
       ReplicationGroupDescription: Customer Portal Redis - Multi-AZ
@@ -50,7 +69,11 @@ Resources:
           Value: customer-portal
 
 Outputs:
+  # Old endpoint (consumers still using this)
+  LegacyCacheEndpoint:
+    Value: !GetAtt PortalCache.RedisEndpoint.Address
+  # New endpoint (consumers should migrate to this)
   CacheEndpoint:
-    Value: !GetAtt PortalCacheReplicationGroup.PrimaryEndPoint.Address
+    Value: !GetAtt PortalCacheMultiAZ.PrimaryEndPoint.Address
   CachePort:
-    Value: !GetAtt PortalCacheReplicationGroup.PrimaryEndPoint.Port
+    Value: !GetAtt PortalCacheMultiAZ.PrimaryEndPoint.Port
